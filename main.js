@@ -21,10 +21,45 @@ function searchRecords() {
     } else {
       console.log(`Found ${results.length} matching record(s):`);
       results.forEach((r, index) => {
-        console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value}`);
+        console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`);
       });
     }
     menu(); // Return to menu after search
+  });
+}
+
+// Function to sort records
+function sortRecords() {
+  rl.question('Choose field to sort by (Name/Created): ', field => {
+    const sortField = field.toLowerCase();
+    if (sortField !== 'name' && sortField !== 'created') {
+      console.log('Invalid field.');
+      return menu();
+    }
+
+    rl.question('Choose order (Ascending/Descending): ', order => {
+      const ascending = order.toLowerCase() === 'ascending';
+      const recordsCopy = [...db.listRecords()]; // copy to avoid modifying vault
+
+      recordsCopy.sort((a, b) => {
+        if (sortField === 'name') {
+          return ascending
+            ? a.name.localeCompare(b.name)
+            : b.name.localeCompare(a.name);
+        } else { // sortField === 'created'
+          return ascending
+            ? new Date(a.created) - new Date(b.created)
+            : new Date(b.created) - new Date(a.created);
+        }
+      });
+
+      console.log('Sorted Records:');
+      recordsCopy.forEach((r, index) => {
+        console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`);
+      });
+
+      menu(); // Return to menu after sorting
+    });
   });
 }
 
@@ -36,7 +71,8 @@ function menu() {
 3. Update Record
 4. Delete Record
 5. Search Records
-6. Exit
+6. Sort Records
+7. Exit
 =====================
   `);
 
@@ -55,7 +91,7 @@ function menu() {
       case '2':
         const records = db.listRecords();
         if (records.length === 0) console.log('No records found.');
-        else records.forEach(r => console.log(`ID: ${r.id} | Name: ${r.name} | Value: ${r.value}`));
+        else records.forEach(r => console.log(`ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`));
         menu();
         break;
 
@@ -80,10 +116,14 @@ function menu() {
         break;
 
       case '5':
-        searchRecords(); // Call the search function
+        searchRecords();
         break;
 
       case '6':
+        sortRecords();
+        break;
+
+      case '7':
         console.log('👋 Exiting NodeVault...');
         rl.close();
         break;

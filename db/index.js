@@ -2,15 +2,27 @@ const fileDB = require('./file');
 const recordUtils = require('./record');
 const vaultEvents = require('../events');
 
+const data = fileDB.readDB();
+let updated = false;
+data.forEach(r => {
+  if (!r.created) {
+    r.created = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    updated = true;
+  }
+});
+if (updated) fileDB.writeDB(data);
+
 function addRecord({ name, value }) {
   recordUtils.validateRecord({ name, value });
   const data = fileDB.readDB();
-  const newRecord = { id: recordUtils.generateId(), name, value };
+  const created = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const newRecord = { id: recordUtils.generateId(), name, value, created }; // add created field
   data.push(newRecord);
   fileDB.writeDB(data);
   vaultEvents.emit('recordAdded', newRecord);
   return newRecord;
 }
+
 
 function listRecords() {
   return fileDB.readDB();
