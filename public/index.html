@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NodeVault</title>
+</head>
+<body>
+  <h1>NodeVault Web Interface</h1>
+
+  <!-- Add Record -->
+  <h2>Add Record</h2>
+  <input type="text" id="addName" placeholder="Name">
+  <input type="text" id="addValue" placeholder="Value">
+  <button onclick="addRecord()">Add</button>
+
+  <!-- Update Record -->
+  <h2>Update Record</h2>
+  <input type="text" id="updateId" placeholder="Record ID">
+  <input type="text" id="updateName" placeholder="New Name">
+  <input type="text" id="updateValue" placeholder="New Value">
+  <button onclick="updateRecord()">Update</button>
+
+  <!-- Delete Record -->
+  <h2>Delete Record</h2>
+  <input type="text" id="deleteId" placeholder="Record ID">
+  <button onclick="deleteRecord()">Delete</button>
+
+  <!-- Search Record -->
+  <h2>Search Records</h2>
+  <input type="text" id="searchKeyword" placeholder="Keyword">
+  <button onclick="searchRecords()">Search</button>
+  <ul id="searchResults"></ul>
+
+  <!-- List All Records -->
+  <h2>All Records</h2>
+  <button onclick="listRecords()">List All</button>
+  <ul id="allRecords"></ul>
+
+  <script>
+    const API = '/records';
+
+    // Add Record
+    async function addRecord() {
+      const name = document.getElementById('addName').value;
+      const value = document.getElementById('addValue').value;
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, value })
+      });
+      const data = await res.json();
+      alert(data.message);
+      listRecords();
+    }
+
+    // List Records
+    async function listRecords() {
+      const res = await fetch(API);
+      const data = await res.json();
+      const list = document.getElementById('allRecords');
+      list.innerHTML = '';
+      data.forEach(r => {
+        const li = document.createElement('li');
+        li.textContent = `ID: ${r.id} | Name: ${r.name} | Value: ${r.value}`;
+        list.appendChild(li);
+      });
+    }
+
+    // Update Record
+    async function updateRecord() {
+      const id = document.getElementById('updateId').value;
+      const name = document.getElementById('updateName').value;
+      const value = document.getElementById('updateValue').value;
+      const res = await fetch(`${API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, value })
+      });
+      const data = await res.json();
+      alert(data.message);
+      listRecords();
+    }
+
+    // Delete Record
+    async function deleteRecord() {
+      const id = document.getElementById('deleteId').value;
+      const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      alert(data.message);
+      listRecords();
+    }
+
+    // Search Records
+    async function searchRecords() {
+      const keyword = document.getElementById('searchKeyword').value;
+      const res = await fetch(`${API}/search?keyword=${keyword}`);
+      const data = await res.json();
+      const results = document.getElementById('searchResults');
+      results.innerHTML = '';
+      if (data.length === 0) {
+        results.textContent = 'No records found';
+      } else {
+        data.forEach(r => {
+          const li = document.createElement('li');
+          li.textContent = `ID: ${r.id} | Name: ${r.name} | Value: ${r.value}`;
+          results.appendChild(li);
+        });
+      }
+    }
+  </script>
+</body>
+</html>

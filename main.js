@@ -1,133 +1,108 @@
+const connectMongo = require('./db/mongo'); // Adjust path if needed
+connectMongo();
+
 const readline = require('readline');
 const fs = require('fs');
-const db = require('./db');
-require('./events/logger'); // Initialize event logger
+const path = require('path');
+const db = require('./db');   // MongoDB-based DB
+require('./events/logger');   // Logger auto-runs
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-// -------------------- Functions -------------------- //
+// ------------------------
+// 🔹 Search Functionality (Async)
+// ------------------------
+async function searchRecords(keyword) {
+  keyword = keyword.toLowerCase();
+  const records = await db.listRecords();
 
-// Search Records
-function searchRecords() {
-  rl.question('Enter search keyword (ID or Name): ', keyword => {
-    const lowerKeyword = keyword.toLowerCase();
-    const results = db.listRecords().filter(record =>
-      record.name.toLowerCase().includes(lowerKeyword) ||
-      record.id.toString() === keyword
-    );
+  const results = records.filter(record =>
+    record.name.toLowerCase().includes(keyword) ||
+    record.id.toString().includes(keyword)
+  );
 
-    if (results.length === 0) {
-      console.log('No records found.');
-    } else {
-      console.log(`Found ${results.length} matching record(s):`);
-      results.forEach((r, index) => {
-        console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`);
-      });
-    }
-    menu();
-  });
-}
-
-// Sort Records
-function sortRecords() {
-  rl.question('Choose field to sort by (Name/Created): ', field => {
-    const sortField = field.toLowerCase();
-    if (sortField !== 'name' && sortField !== 'created') {
-      console.log('Invalid field.');
-      return menu();
-    }
-
-    rl.question('Choose order (Ascending/Descending): ', order => {
-      const ascending = order.toLowerCase() === 'ascending';
-      const recordsCopy = [...db.listRecords()]; // copy so original DB is unchanged
-
-      recordsCopy.sort((a, b) => {
-        if (sortField === 'name') {
-          return ascending ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-        } else { // created
-          return ascending ? new Date(a.created) - new Date(b.created) : new Date(b.created) - new Date(a.created);
-        }
-      });
-
-      console.log('Sorted Records:');
-      recordsCopy.forEach((r, index) => {
-        console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`);
-      });
-
-      menu();
-    });
-  });
-}
-
-// Export Records
-function exportData() {
-  const records = db.listRecords();
-  const now = new Date();
-  const header = `
-================ NodeVault Export ================
-Date: ${now.toLocaleString()}
-Total Records: ${records.length}
-File: export.txt
-=================================================
-`;
-
-  let content = header;
-
-  if (records.length === 0) {
-    content += "\nNo records available.\n";
+  if (results.length === 0) {
+    console.log("No records found.");
   } else {
-    records.forEach((r, index) => {
-      content += `${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}\n`;
+    console.log(`Found ${results.length} matching record(s):`);
+    results.forEach((record, index) => {
+      console.log(
+        `${index + 1}. ID: ${record.id} | Name: ${record.name} | Value: ${record.value} | Created: ${record.createdAt}`
+      );
     });
   }
-
-  fs.writeFileSync('export.txt', content, 'utf-8');
-  console.log('✅ Data exported successfully to export.txt.');
-  menu();
 }
 
-// View Vault Statistics
-function viewVaultStatistics() {
-  const records = db.listRecords();
+// ------------------------
+// 🔹 Export Functionality (Async)
+// ------------------------
+async function exportData() {
+  const records = await db.listRecords();
   if (records.length === 0) {
-    console.log('No records in vault.');
-    return menu();
+    console.log("No records to export.");
+    return;
+  }
+
+  const exportFile = path.join(__dirname, 'export.txt');
+  const now = new Date().toLocaleString();
+
+  let content = `NodeVault Export\nDate & Time: ${now}\nTotal Records: ${records.length}\nFile: export.txt\n\n`;
+  content += "ID | Name | Value | Created\n";
+  content += "----------------------------------\n";
+
+  records.forEach(r => {
+    const created = r.createdAt || "N/A";
+    content += `${r.id} | ${r.name} | ${r.value} | ${created}\n`;
+  });
+
+  fs.writeFileSync(exportFile, content, 'utf8');
+  console.log(`✅ Data exported successfully to ${exportFile}`);
+}
+
+// ------------------------
+// 🔹 Vault Statistics (Async)
+// ------------------------
+async function viewVaultStatistics() {
+  const records = await db.listRecords();
+
+  if (records.length === 0) {
+    console.log("No records found in the vault.");
+    return;
   }
 
   const totalRecords = records.length;
-  const vaultFilePath = require('path').join(__dirname, './file.json'); // adjust to your DB file
-  const stats = fs.statSync(vaultFilePath);
-  const lastModified = stats.mtime.toLocaleString();
 
-  let longestName = '';
-  records.forEach(r => {
-    if (r.name.length > longestName.length) longestName = r.name;
-  });
+  const lastModified = records.reduce((latest, record) => {
+    const date = new Date(record.createdAt);
+    return date > latest ? date : latest;
+  }, new Date(0));
 
-  const creationDates = records
-    .map(r => new Date(r.created))
+  const longestRecord = records.reduce((longest, record) => {
+    return record.name.length > longest.name.length ? record : longest;
+  }, records[0]);
+
+  const sortedByDate = records
+    .map(r => new Date(r.createdAt))
     .sort((a, b) => a - b);
-  const earliest = creationDates[0].toISOString().split('T')[0];
-  const latest = creationDates[creationDates.length - 1].toISOString().split('T')[0];
 
-  console.log(`
-Vault Statistics:
---------------------------
-Total Records: ${totalRecords}
-Last Modified: ${lastModified}
-Longest Name: ${longestName} (${longestName.length} characters)
-Earliest Record: ${earliest}
-Latest Record: ${latest}
-  `);
+  const earliest = sortedByDate[0];
+  const latest = sortedByDate[sortedByDate.length - 1];
 
-  menu();
+  console.log("\nVault Statistics:");
+  console.log("--------------------------");
+  console.log(`Total Records: ${totalRecords}`);
+  console.log(`Last Modified: ${lastModified.toLocaleString()}`);
+  console.log(`Longest Name: ${longestRecord.name} (${longestRecord.name.length} characters)`);
+  console.log(`Earliest Record: ${earliest.toISOString().split('T')[0]}`);
+  console.log(`Latest Record: ${latest.toISOString().split('T')[0]}`);
 }
 
-// -------------------- Menu -------------------- //
-
+// ------------------------
+// 🔹 Main Menu
+// ------------------------
 function menu() {
   console.log(`
 ===== NodeVault =====
@@ -135,7 +110,7 @@ function menu() {
 2. List Records
 3. Update Record
 4. Delete Record
-5. Search Records
+5. Search Record
 6. Sort Records
 7. Export Data
 8. View Vault Statistics
@@ -143,12 +118,13 @@ function menu() {
 =====================
   `);
 
-  rl.question('Choose option: ', ans => {
+  rl.question('Choose option: ', async ans => {
+
     switch (ans.trim()) {
       case '1':
         rl.question('Enter name: ', name => {
-          rl.question('Enter value: ', value => {
-            db.addRecord({ name, value });
+          rl.question('Enter value: ', async value => {
+            await db.addRecord({ name, value });
             console.log('✅ Record added successfully!');
             menu();
           });
@@ -156,17 +132,19 @@ function menu() {
         break;
 
       case '2':
-        const records = db.listRecords();
+        const records = await db.listRecords();
         if (records.length === 0) console.log('No records found.');
-        else records.forEach(r => console.log(`ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`));
+        else records.forEach(r =>
+          console.log(`ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.createdAt}`)
+        );
         menu();
         break;
 
       case '3':
         rl.question('Enter record ID to update: ', id => {
           rl.question('New name: ', name => {
-            rl.question('New value: ', value => {
-              const updated = db.updateRecord(Number(id), name, value);
+            rl.question('New value: ', async value => {
+              const updated = await db.updateRecord(Number(id), name, value);
               console.log(updated ? '✅ Record updated!' : '❌ Record not found.');
               menu();
             });
@@ -175,27 +153,56 @@ function menu() {
         break;
 
       case '4':
-        rl.question('Enter record ID to delete: ', id => {
-          const deleted = db.deleteRecord(Number(id));
+        rl.question('Enter record ID to delete: ', async id => {
+          const deleted = await db.deleteRecord(Number(id));
           console.log(deleted ? '🗑️ Record deleted!' : '❌ Record not found.');
           menu();
         });
         break;
 
       case '5':
-        searchRecords();
+        rl.question('Enter search keyword: ', async keyword => {
+          await searchRecords(keyword);
+          menu();
+        });
         break;
 
       case '6':
-        sortRecords();
+        rl.question('Sort by (name/date): ', field => {
+          rl.question('Order (asc/desc): ', async order => {
+            const records = await db.listRecords();
+            let sorted = [...records];
+
+            if (field.toLowerCase() === 'name') {
+              sorted.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (field.toLowerCase() === 'date') {
+              sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            } else {
+              console.log('Invalid field!');
+              return menu();
+            }
+
+            if (order.toLowerCase() === 'desc') sorted.reverse();
+
+            console.log('Sorted Records:');
+            sorted.forEach((r, index) => {
+              console.log(
+                `${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.createdAt}`
+              );
+            });
+            menu();
+          });
+        });
         break;
 
       case '7':
-        exportData();
+        await exportData();
+        menu();
         break;
 
       case '8':
-        viewVaultStatistics();
+        await viewVaultStatistics();
+        menu();
         break;
 
       case '9':
@@ -210,6 +217,5 @@ function menu() {
   });
 }
 
-// -------------------- Start App -------------------- //
 menu();
 
