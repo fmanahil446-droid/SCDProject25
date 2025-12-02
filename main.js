@@ -89,6 +89,43 @@ File: export.txt
   menu();
 }
 
+// View Vault Statistics
+function viewVaultStatistics() {
+  const records = db.listRecords();
+  if (records.length === 0) {
+    console.log('No records in vault.');
+    return menu();
+  }
+
+  const totalRecords = records.length;
+  const vaultFilePath = require('path').join(__dirname, './file.json'); // adjust to your DB file
+  const stats = fs.statSync(vaultFilePath);
+  const lastModified = stats.mtime.toLocaleString();
+
+  let longestName = '';
+  records.forEach(r => {
+    if (r.name.length > longestName.length) longestName = r.name;
+  });
+
+  const creationDates = records
+    .map(r => new Date(r.created))
+    .sort((a, b) => a - b);
+  const earliest = creationDates[0].toISOString().split('T')[0];
+  const latest = creationDates[creationDates.length - 1].toISOString().split('T')[0];
+
+  console.log(`
+Vault Statistics:
+--------------------------
+Total Records: ${totalRecords}
+Last Modified: ${lastModified}
+Longest Name: ${longestName} (${longestName.length} characters)
+Earliest Record: ${earliest}
+Latest Record: ${latest}
+  `);
+
+  menu();
+}
+
 // -------------------- Menu -------------------- //
 
 function menu() {
@@ -101,7 +138,8 @@ function menu() {
 5. Search Records
 6. Sort Records
 7. Export Data
-8. Exit
+8. View Vault Statistics
+9. Exit
 =====================
   `);
 
@@ -157,6 +195,10 @@ function menu() {
         break;
 
       case '8':
+        viewVaultStatistics();
+        break;
+
+      case '9':
         console.log('👋 Exiting NodeVault...');
         rl.close();
         break;

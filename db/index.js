@@ -3,7 +3,11 @@ const path = require('path');
 const fileDB = require('./file');
 const recordUtils = require('./record');
 const vaultEvents = require('../events');
+const dbFile = './file.json';
 
+if (!fs.existsSync(dbFile)) {
+  fs.writeFileSync(dbFile, '[]', 'utf-8');
+}
 // ------------------ Ensure all existing records have 'created' ------------------ //
 const data = fileDB.readDB();
 let updated = false;
