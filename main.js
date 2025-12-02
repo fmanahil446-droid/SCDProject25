@@ -1,4 +1,5 @@
 const readline = require('readline');
+const fs = require('fs');
 const db = require('./db');
 require('./events/logger'); // Initialize event logger
 
@@ -7,7 +8,9 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-// Function to search records
+// -------------------- Functions -------------------- //
+
+// Search Records
 function searchRecords() {
   rl.question('Enter search keyword (ID or Name): ', keyword => {
     const lowerKeyword = keyword.toLowerCase();
@@ -24,11 +27,11 @@ function searchRecords() {
         console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`);
       });
     }
-    menu(); // Return to menu after search
+    menu();
   });
 }
 
-// Function to sort records
+// Sort Records
 function sortRecords() {
   rl.question('Choose field to sort by (Name/Created): ', field => {
     const sortField = field.toLowerCase();
@@ -39,17 +42,13 @@ function sortRecords() {
 
     rl.question('Choose order (Ascending/Descending): ', order => {
       const ascending = order.toLowerCase() === 'ascending';
-      const recordsCopy = [...db.listRecords()]; // copy to avoid modifying vault
+      const recordsCopy = [...db.listRecords()]; // copy so original DB is unchanged
 
       recordsCopy.sort((a, b) => {
         if (sortField === 'name') {
-          return ascending
-            ? a.name.localeCompare(b.name)
-            : b.name.localeCompare(a.name);
-        } else { // sortField === 'created'
-          return ascending
-            ? new Date(a.created) - new Date(b.created)
-            : new Date(b.created) - new Date(a.created);
+          return ascending ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        } else { // created
+          return ascending ? new Date(a.created) - new Date(b.created) : new Date(b.created) - new Date(a.created);
         }
       });
 
@@ -58,10 +57,39 @@ function sortRecords() {
         console.log(`${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}`);
       });
 
-      menu(); // Return to menu after sorting
+      menu();
     });
   });
 }
+
+// Export Records
+function exportData() {
+  const records = db.listRecords();
+  const now = new Date();
+  const header = `
+================ NodeVault Export ================
+Date: ${now.toLocaleString()}
+Total Records: ${records.length}
+File: export.txt
+=================================================
+`;
+
+  let content = header;
+
+  if (records.length === 0) {
+    content += "\nNo records available.\n";
+  } else {
+    records.forEach((r, index) => {
+      content += `${index + 1}. ID: ${r.id} | Name: ${r.name} | Value: ${r.value} | Created: ${r.created}\n`;
+    });
+  }
+
+  fs.writeFileSync('export.txt', content, 'utf-8');
+  console.log('✅ Data exported successfully to export.txt.');
+  menu();
+}
+
+// -------------------- Menu -------------------- //
 
 function menu() {
   console.log(`
@@ -72,7 +100,8 @@ function menu() {
 4. Delete Record
 5. Search Records
 6. Sort Records
-7. Exit
+7. Export Data
+8. Exit
 =====================
   `);
 
@@ -124,6 +153,10 @@ function menu() {
         break;
 
       case '7':
+        exportData();
+        break;
+
+      case '8':
         console.log('👋 Exiting NodeVault...');
         rl.close();
         break;
@@ -135,5 +168,6 @@ function menu() {
   });
 }
 
+// -------------------- Start App -------------------- //
 menu();
 
